@@ -56,9 +56,7 @@ module "castai_aws_edge_location" {
   cluster_id      = module.castai-gke-cluster.cluster_id
   organization_id = module.castai-gke-cluster.organization_id
 
-  aws = {
-    region = data.aws_region.current.region
-  }
+  region = data.aws_region.current.region
 
   tags = {
     ManagedBy = "terraform"

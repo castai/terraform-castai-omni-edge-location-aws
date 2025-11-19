@@ -9,7 +9,8 @@ Terraform module for creating CAST AI edge locations on AWS.
 
 ```hcl
 module "castai_aws_edge_location" {
-  source = "github.com/castai/terraform-castai-omni-edge-location-aws"
+  source  = "castai/omni-edge-location-aws/castai"
+  version = "~> 1.0"
 
   cluster_id      = var.cluster_id
   organization_id = var.organization_id
@@ -30,16 +31,17 @@ module "castai_aws_edge_location" {
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.0 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 4.0 |
 | <a name="requirement_castai"></a> [castai](#requirement\_castai) | >= 8.1.1 |
+| <a name="requirement_null"></a> [null](#requirement\_null) | >= 3.0 |
 | <a name="requirement_random"></a> [random](#requirement\_random) | >= 3.0 |
 
 ## Providers
 
 | Name | Version |
 |------|---------|
-| <a name="provider_aws"></a> [aws](#provider\_aws) | >= 4.0 |
-| <a name="provider_castai"></a> [castai](#provider\_castai) | >= 8.1.1 |
-| <a name="provider_null"></a> [null](#provider\_null) | n/a |
-| <a name="provider_random"></a> [random](#provider\_random) | >= 3.0 |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | 6.21.0 |
+| <a name="provider_castai"></a> [castai](#provider\_castai) | 8.2.1 |
+| <a name="provider_null"></a> [null](#provider\_null) | 3.2.4 |
+| <a name="provider_random"></a> [random](#provider\_random) | 3.7.2 |
 
 ## Modules
 
