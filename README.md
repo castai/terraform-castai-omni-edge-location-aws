@@ -9,7 +9,8 @@ Terraform module for creating CAST AI edge locations on AWS.
 
 ```hcl
 module "castai_aws_edge_location" {
-  source = "github.com/castai/terraform-castai-omni-edge-location-aws"
+  source  = "castai/omni-edge-location-aws/castai"
+  version = "~> 1.0"
 
   cluster_id      = var.cluster_id
   organization_id = var.organization_id
