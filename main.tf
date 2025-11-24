@@ -100,6 +100,7 @@ resource "aws_iam_policy" "castai" {
           "ec2:DescribeTags",
           "ec2:DescribeVolumes",
           "ec2:DescribeVpcs",
+          "ec2:DescribeInternetGateways",
           "iam:ListInstanceProfiles",
           "iam:ListRoles"
         ]
