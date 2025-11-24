@@ -38,8 +38,8 @@ module "castai_aws_edge_location" {
 
 | Name | Version |
 |------|---------|
-| <a name="provider_aws"></a> [aws](#provider\_aws) | 6.21.0 |
-| <a name="provider_castai"></a> [castai](#provider\_castai) | 8.2.1 |
+| <a name="provider_aws"></a> [aws](#provider\_aws) | 6.22.1 |
+| <a name="provider_castai"></a> [castai](#provider\_castai) | 8.3.0 |
 | <a name="provider_null"></a> [null](#provider\_null) | 3.2.4 |
 | <a name="provider_random"></a> [random](#provider\_random) | 3.7.2 |
 
