@@ -225,15 +225,7 @@ resource "aws_security_group" "main" {
   description = "Custom Security Group with specific ports"
   vpc_id      = aws_vpc.main.id
 
-  # TCP ports: 443, 6443
-  ingress {
-    description = "HTTPS"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = [var.security_group_source_cidr]
-  }
-
+  # TCP ports: 6443
   ingress {
     description = "Kubernetes API"
     from_port   = 6443
