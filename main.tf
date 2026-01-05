@@ -84,9 +84,7 @@ data "aws_subnets" "existing" {
   }
 }
 
-# Determine which subnet IDs to use for data source lookup
 locals {
-  # Use explicitly provided subnet IDs if available, otherwise use auto-discovered ones
   subnet_ids_to_lookup = (
     var.existing_subnet_ids != null ? var.existing_subnet_ids :
     var.existing_vpc_id != null ? data.aws_subnets.existing[0].ids :
@@ -94,7 +92,6 @@ locals {
   )
 }
 
-# Get details of each subnet to map them to availability zones
 data "aws_subnet" "existing" {
   for_each = toset(local.subnet_ids_to_lookup)
   id       = each.value
