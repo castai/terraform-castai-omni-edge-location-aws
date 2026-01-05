@@ -62,7 +62,7 @@ data "aws_caller_identity" "current" {}
 # Data source to get current AWS region from provider
 data "aws_region" "current" {}
 
-# Data source to get all available zones in the region (only needed when creating new VPC)
+# Data source to get all available zones in the region
 data "aws_availability_zones" "available" {
   count = var.existing_vpc_id == null ? 1 : 0
   state = "available"
@@ -100,27 +100,23 @@ data "aws_subnet" "existing" {
   id       = each.value
 }
 
-# Build available zones list - must be computed before aws_subnet.main
 locals {
   # Get available zones based on scenario:
   # - New VPC: use all available zones in region
-  # - Existing VPC: derive directly from subnet data sources (not from subnet_ids map to avoid cycle)
+  # - Existing VPC: derive directly from subnet data sources
   available_zones = (
     var.existing_vpc_id == null ? data.aws_availability_zones.available[0].names :
     distinct([for subnet in data.aws_subnet.existing : subnet.availability_zone])
   )
 
-  # Create subnet CIDR blocks (only needed for new VPC)
+  # Create subnet CIDR blocks
   subnet_cidrs = var.existing_vpc_id == null ? [
     for idx, zone in data.aws_availability_zones.available[0].names :
     cidrsubnet(var.vpc_cidr, 8, idx)
   ] : []
 }
 
-# Build subnet_ids map after aws_subnet.main is created
 locals {
-  # Build subnet_ids map: az => subnet_id
-  # Use existing subnets (either explicit or auto-discovered) or newly created subnets
   subnet_ids = (
     length(local.subnet_ids_to_lookup) > 0 ? {
       for subnet_id, subnet in data.aws_subnet.existing :
@@ -132,7 +128,6 @@ locals {
   )
 }
 
-# Get zone details to fetch zone IDs for CAST AI
 data "aws_availability_zone" "zones" {
   for_each = toset(local.available_zones)
   name     = each.value
