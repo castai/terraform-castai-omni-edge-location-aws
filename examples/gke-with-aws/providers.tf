@@ -4,7 +4,7 @@ terraform {
   required_providers {
     castai = {
       source  = "castai/castai"
-      version = ">= 8.1.0"
+      version = ">= 8.4.0"
     }
     aws = {
       source  = "hashicorp/aws"
@@ -13,6 +13,14 @@ terraform {
     google = {
       source  = "hashicorp/google"
       version = ">= 4.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = ">= 2.0"
+    }
+    helm = {
+      source  = "hashicorp/helm"
+      version = ">= 2.0"
     }
   }
 }
@@ -23,6 +31,12 @@ provider "aws" {
 
 provider "google" {
   project = var.google_project_id
+}
+
+provider "kubernetes" {
+  host                   = "https://${data.google_container_cluster.gke.endpoint}"
+  token                  = data.google_client_config.default.access_token
+  cluster_ca_certificate = base64decode(data.google_container_cluster.gke.master_auth.0.cluster_ca_certificate)
 }
 
 provider "helm" {

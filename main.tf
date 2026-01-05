@@ -1,24 +1,36 @@
 # AWS Edge Location for CAST AI
 
 locals {
-  # Generate name if not provided (with random suffix)
-  generated_name = var.name != null ? var.name : "aws-${var.region}-${random_id.suffix.hex}"
+  # Extract VPC name from existing VPC tags or use vpc-id as fallback
+  existing_vpc_name = var.existing_vpc_id != null ? (
+    try(data.aws_vpc.existing[0].tags["Name"], null) != null ?
+      data.aws_vpc.existing[0].tags["Name"] :
+      var.existing_vpc_id
+  ) : null
 
-  # Sanitize name for AWS resource naming (max 35 chars for parts of names)
-  sanitized_name = substr(replace(local.generated_name, "/[^a-zA-Z0-9_-]/", ""), 0, 35)
+  base_name = (
+    var.name != null ? var.name :
+    var.existing_vpc_id != null ? "${local.existing_vpc_name}-${var.region}" :
+    "aws-${var.region}"
+  )
+
+
+  # Final edge location name
+  generated_name = (
+    var.name != null ? substr(local.base_name, 0, 30) :
+    var.existing_vpc_id != null ? "${substr(local.base_name, 0, 21)}-${random_id.suffix.hex}" :
+    "${local.base_name}-${random_id.suffix.hex}"
+  )
+
+  # For AWS resources (IAM, security groups)
+  sanitized_name = (
+    var.name != null ? substr(local.base_name, 0, 35) :
+    var.existing_vpc_id != null ? "${substr(local.base_name, 0, 26)}-${random_id.suffix.hex}" :
+    "${local.base_name}-${random_id.suffix.hex}"
+  )
 
   # Full resource name with prefix
   resource_name = "castai-omni-${local.sanitized_name}"
-
-  # Get all available zones in the region
-  available_zones = data.aws_availability_zones.available.names
-
-  # Create subnet CIDR blocks (/24 subnets from VPC /16)
-  # Simple sequential allocation: 10.0.0.0/24, 10.0.1.0/24, 10.0.2.0/24, etc.
-  subnet_cidrs = [
-    for idx, zone in local.available_zones :
-    cidrsubnet(var.vpc_cidr, 8, idx)
-  ]
 
   # Common tags merged once and reused across all resources
   common_tags = merge(
@@ -28,6 +40,15 @@ locals {
       "cast-omni:cluster-id" = var.cluster_id
     }
   )
+
+  vpc_id            = var.existing_vpc_id != null ? var.existing_vpc_id : aws_vpc.main[0].id
+  security_group_id = aws_security_group.main.id
+
+  default_description = var.existing_vpc_id != null ? (
+    try(data.aws_vpc.existing[0].tags["Name"], null) != null ?
+      "AWS edge location onboarded by Terraform using existing VPC ${data.aws_vpc.existing[0].tags["Name"]} (${var.existing_vpc_id})" :
+      "AWS edge location onboarded by Terraform using existing VPC ${var.existing_vpc_id}"
+  ) : "AWS edge location onboarded by Terraform"
 }
 
 # Generate random suffix for edge location name
@@ -41,12 +62,77 @@ data "aws_caller_identity" "current" {}
 # Data source to get current AWS region from provider
 data "aws_region" "current" {}
 
-# Data source to get all available zones in the region
+# Data source to get all available zones in the region (only needed when creating new VPC)
 data "aws_availability_zones" "available" {
+  count = var.existing_vpc_id == null ? 1 : 0
   state = "available"
 }
 
-# Data source to get zone details including zone IDs
+# Data sources for existing VPC resources (when provided)
+data "aws_vpc" "existing" {
+  count = var.existing_vpc_id != null ? 1 : 0
+  id    = var.existing_vpc_id
+}
+
+# Get all subnet IDs in the existing VPC (when VPC is provided but subnet_ids are not)
+data "aws_subnets" "existing" {
+  count = var.existing_vpc_id != null && var.existing_subnet_ids == null ? 1 : 0
+
+  filter {
+    name   = "vpc-id"
+    values = [var.existing_vpc_id]
+  }
+}
+
+# Determine which subnet IDs to use for data source lookup
+locals {
+  # Use explicitly provided subnet IDs if available, otherwise use auto-discovered ones
+  subnet_ids_to_lookup = (
+    var.existing_subnet_ids != null ? var.existing_subnet_ids :
+    var.existing_vpc_id != null ? data.aws_subnets.existing[0].ids :
+    []
+  )
+}
+
+# Get details of each subnet to map them to availability zones
+data "aws_subnet" "existing" {
+  for_each = toset(local.subnet_ids_to_lookup)
+  id       = each.value
+}
+
+# Build available zones list - must be computed before aws_subnet.main
+locals {
+  # Get available zones based on scenario:
+  # - New VPC: use all available zones in region
+  # - Existing VPC: derive directly from subnet data sources (not from subnet_ids map to avoid cycle)
+  available_zones = (
+    var.existing_vpc_id == null ? data.aws_availability_zones.available[0].names :
+    distinct([for subnet in data.aws_subnet.existing : subnet.availability_zone])
+  )
+
+  # Create subnet CIDR blocks (only needed for new VPC)
+  subnet_cidrs = var.existing_vpc_id == null ? [
+    for idx, zone in data.aws_availability_zones.available[0].names :
+    cidrsubnet(var.vpc_cidr, 8, idx)
+  ] : []
+}
+
+# Build subnet_ids map after aws_subnet.main is created
+locals {
+  # Build subnet_ids map: az => subnet_id
+  # Use existing subnets (either explicit or auto-discovered) or newly created subnets
+  subnet_ids = (
+    length(local.subnet_ids_to_lookup) > 0 ? {
+      for subnet_id, subnet in data.aws_subnet.existing :
+      subnet.availability_zone => subnet.id
+    } : {
+      for idx, subnet in aws_subnet.main :
+      data.aws_availability_zones.available[0].names[idx] => subnet.id
+    }
+  )
+}
+
+# Get zone details to fetch zone IDs for CAST AI
 data "aws_availability_zone" "zones" {
   for_each = toset(local.available_zones)
   name     = each.value
@@ -161,8 +247,9 @@ resource "aws_iam_access_key" "castai" {
 # VPC and Networking
 # =============================================================================
 
-# VPC
 resource "aws_vpc" "main" {
+  count = var.existing_vpc_id == null ? 1 : 0
+
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
   enable_dns_support   = true
@@ -170,18 +257,18 @@ resource "aws_vpc" "main" {
   tags = local.common_tags
 }
 
-# Internet Gateway
 resource "aws_internet_gateway" "main" {
-  vpc_id = aws_vpc.main.id
+  count = var.existing_vpc_id == null ? 1 : 0
+
+  vpc_id = aws_vpc.main[0].id
 
   tags = local.common_tags
 }
 
-# Subnets (one per availability zone)
 resource "aws_subnet" "main" {
-  count = length(local.available_zones)
+  count = var.existing_vpc_id == null ? length(local.available_zones) : 0
 
-  vpc_id                  = aws_vpc.main.id
+  vpc_id                  = aws_vpc.main[0].id
   cidr_block              = local.subnet_cidrs[count.index]
   availability_zone       = local.available_zones[count.index]
   map_public_ip_on_launch = true
@@ -194,26 +281,27 @@ resource "aws_subnet" "main" {
   )
 }
 
-# Route Table
 resource "aws_route_table" "main" {
-  vpc_id = aws_vpc.main.id
+  count = var.existing_vpc_id == null ? 1 : 0
+
+  vpc_id = aws_vpc.main[0].id
 
   tags = local.common_tags
 }
 
-# Route to Internet Gateway
 resource "aws_route" "internet" {
-  route_table_id         = aws_route_table.main.id
+  count = var.existing_vpc_id == null ? 1 : 0
+
+  route_table_id         = aws_route_table.main[0].id
   destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.main.id
+  gateway_id             = aws_internet_gateway.main[0].id
 }
 
-# Associate route table with subnets
 resource "aws_route_table_association" "main" {
   count = length(aws_subnet.main)
 
   subnet_id      = aws_subnet.main[count.index].id
-  route_table_id = aws_route_table.main.id
+  route_table_id = aws_route_table.main[0].id
 }
 
 # =============================================================================
@@ -223,7 +311,7 @@ resource "aws_route_table_association" "main" {
 resource "aws_security_group" "main" {
   name        = local.resource_name
   description = "Custom Security Group with specific ports"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = local.vpc_id
 
   # TCP ports: 443, 6443
   ingress {
@@ -272,7 +360,7 @@ resource "castai_edge_location" "this" {
   region          = var.region
   cluster_id      = var.cluster_id
   organization_id = var.organization_id
-  description     = var.description != null ? var.description : "AWS edge location onboarded by Terraform"
+  description     = var.description != null ? var.description : local.default_description
   zones = [
     for zone in local.available_zones : {
       id   = data.aws_availability_zone.zones[zone].zone_id
@@ -285,12 +373,9 @@ resource "castai_edge_location" "this" {
     account_id           = data.aws_caller_identity.current.account_id
     access_key_id_wo     = aws_iam_access_key.castai.id
     secret_access_key_wo = aws_iam_access_key.castai.secret
-    vpc_id               = aws_vpc.main.id
-    security_group_id    = aws_security_group.main.id
-    subnet_ids = {
-      for idx, subnet in aws_subnet.main :
-      local.available_zones[idx] => subnet.id
-    }
-    name_tag = local.resource_name
+    vpc_id               = local.vpc_id
+    security_group_id    = local.security_group_id
+    subnet_ids           = local.subnet_ids
+    name_tag             = local.resource_name
   }
 }

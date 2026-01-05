@@ -43,7 +43,7 @@ module "castai-gke-cluster" {
     }
   }
 
-  // TODO: enable omni
+  install_omni = true
 }
 
 # =============================================================================
@@ -61,5 +61,35 @@ module "castai_aws_edge_location" {
   tags = {
     ManagedBy = "terraform"
   }
+
+  depends_on = [module.castai-gke-cluster]
 }
 
+# =============================================================================
+# Edge location with existing vpc
+# =============================================================================
+
+module "vpc" {
+  source = "terraform-aws-modules/vpc/aws"
+
+  name = "existing-vpc"
+  cidr = "10.0.0.0/16"
+
+  azs            = ["eu-central-1a", "eu-central-1b"]
+  public_subnets = ["10.0.0.0/24", "10.0.1.0/24"]
+}
+
+module "castai_aws_edge_location_existing_vpc" {
+  source = "../.."
+
+  cluster_id      = module.castai-gke-cluster.cluster_id
+  organization_id = module.castai-gke-cluster.organization_id
+
+  region          = data.aws_region.current.region
+  existing_vpc_id = module.vpc.vpc_id
+
+  tags = {
+    ManagedBy = "terraform"
+  }
+  depends_on = [module.castai-gke-cluster]
+}

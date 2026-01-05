@@ -26,7 +26,7 @@ variable "region" {
 }
 
 variable "vpc_cidr" {
-  description = "CIDR block for the VPC"
+  description = "CIDR block for the VPC (only used when creating a new VPC)"
   type        = string
   default     = "10.0.0.0/16"
 }
@@ -35,6 +35,18 @@ variable "security_group_source_cidr" {
   description = "Source CIDR for security group ingress rules"
   type        = string
   default     = "0.0.0.0/0"
+}
+
+variable "existing_vpc_id" {
+  description = "ID of existing VPC to use. If provided, no new VPC will be created"
+  type        = string
+  default     = null
+}
+
+variable "existing_subnet_ids" {
+  description = "List of subnet IDs from the existing VPC. Optional - if not provided, all subnets from the existing VPC will be automatically discovered"
+  type        = list(string)
+  default     = null
 }
 
 variable "tags" {
