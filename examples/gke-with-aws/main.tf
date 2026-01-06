@@ -93,6 +93,7 @@ module "castai_aws_edge_location_existing_vpc" {
   region     = data.aws_region.current.region
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.public_subnets
+  zones      = module.vpc.azs
 
   tags = {
     ManagedBy = "terraform"

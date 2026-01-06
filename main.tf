@@ -33,10 +33,10 @@ locals {
     }
   )
 
-  vpc_id            = var.vpc_id != null ? var.vpc_id : aws_vpc.main[0].id
+  vpc_id            = var.subnet_ids != null ? var.vpc_id : aws_vpc.main[0].id
   security_group_id = aws_security_group.main.id
 
-  default_description = var.vpc_id != null ? (
+  default_description = var.subnet_ids != null ? (
     "AWS edge location onboarded by Terraform using existing VPC ${var.vpc_id}"
   ) : "AWS edge location onboarded by Terraform"
 }
@@ -52,41 +52,29 @@ data "aws_caller_identity" "current" {}
 # Data source to get current AWS region from provider
 data "aws_region" "current" {}
 
-# Query existing subnets to discover their zones
-data "aws_subnet" "existing" {
-  for_each = var.vpc_id != null && var.subnet_ids != null ? toset(var.subnet_ids) : toset([])
-  id       = each.value
-}
-
 locals {
   # Create subnet CIDR blocks (only used when creating new VPC)
-  subnet_cidrs = var.vpc_id == null ? [
+  subnet_cidrs = var.subnet_ids == null ? [
     for idx in range(length(var.zones)) :
     cidrsubnet(var.vpc_cidr, 8, idx)
   ] : []
 
-  # Discovered zones from existing subnets
-  discovered_zones = var.vpc_id != null ? [
-    for subnet in data.aws_subnet.existing : subnet.availability_zone
-  ] : []
-
-  zones_list = var.vpc_id == null ? var.zones : local.discovered_zones
-
-  new_vpc_subnet_ids = var.vpc_id == null ? {
+  # Map zones to subnet IDs
+  new_vpc_subnet_ids = var.subnet_ids == null ? {
     for idx in range(length(aws_subnet.main)) :
     var.zones[idx] => aws_subnet.main[idx].id
   } : {}
 
-  existing_vpc_subnet_ids = var.vpc_id != null ? {
-    for id, subnet in data.aws_subnet.existing :
-    subnet.availability_zone => id
+  existing_vpc_subnet_ids = var.subnet_ids != null ? {
+    for idx in range(length(var.zones)) :
+    var.zones[idx] => var.subnet_ids[idx]
   } : {}
 
-  subnet_ids_map = var.vpc_id == null ? local.new_vpc_subnet_ids : local.existing_vpc_subnet_ids
+  subnet_ids_map = var.subnet_ids == null ? local.new_vpc_subnet_ids : local.existing_vpc_subnet_ids
 }
 
 data "aws_availability_zone" "zones" {
-  for_each = toset(local.zones_list)
+  for_each = toset(var.zones)
   name     = each.value
 }
 
@@ -109,8 +97,8 @@ resource "null_resource" "validate" {
     }
 
     precondition {
-      condition     = var.vpc_id != null || (var.zones != null && length(var.zones) > 0)
-      error_message = "zones must be provided when creating a new VPC (vpc_id is not provided)."
+      condition     = var.vpc_id == null || length(var.zones) == length(var.subnet_ids)
+      error_message = "The number of zones must match the number of subnet_ids when using an existing VPC."
     }
   }
 }
@@ -215,7 +203,7 @@ resource "aws_iam_access_key" "castai" {
 # =============================================================================
 
 resource "aws_vpc" "main" {
-  count = var.vpc_id == null ? 1 : 0
+  count = var.subnet_ids == null ? 1 : 0
 
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
@@ -225,7 +213,7 @@ resource "aws_vpc" "main" {
 }
 
 resource "aws_internet_gateway" "main" {
-  count = var.vpc_id == null ? 1 : 0
+  count = var.subnet_ids == null ? 1 : 0
 
   vpc_id = aws_vpc.main[0].id
 
@@ -233,7 +221,7 @@ resource "aws_internet_gateway" "main" {
 }
 
 resource "aws_subnet" "main" {
-  count = var.vpc_id == null ? length(var.zones) : 0
+  count = var.subnet_ids == null ? length(var.zones) : 0
 
   vpc_id                  = aws_vpc.main[0].id
   cidr_block              = local.subnet_cidrs[count.index]
@@ -249,7 +237,7 @@ resource "aws_subnet" "main" {
 }
 
 resource "aws_route_table" "main" {
-  count = var.vpc_id == null ? 1 : 0
+  count = var.subnet_ids == null ? 1 : 0
 
   vpc_id = aws_vpc.main[0].id
 
@@ -257,7 +245,7 @@ resource "aws_route_table" "main" {
 }
 
 resource "aws_route" "internet" {
-  count = var.vpc_id == null ? 1 : 0
+  count = var.subnet_ids == null ? 1 : 0
 
   route_table_id         = aws_route_table.main[0].id
   destination_cidr_block = "0.0.0.0/0"
@@ -329,7 +317,7 @@ resource "castai_edge_location" "this" {
   organization_id = var.organization_id
   description     = var.description != null ? var.description : local.default_description
   zones = [
-    for zone in local.zones_list : {
+    for zone in var.zones : {
       id   = data.aws_availability_zone.zones[zone].zone_id
       name = zone
     }
