@@ -57,12 +57,9 @@ No modules.
 | [null_resource.validate_region](https://registry.terraform.io/providers/hashicorp/null/latest/docs/resources/resource) | resource |
 | [random_id.suffix](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/id) | resource |
 | [aws_availability_zone.zones](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/availability_zone) | data source |
-| [aws_availability_zones.available](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/availability_zones) | data source |
 | [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
 | [aws_region.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/region) | data source |
 | [aws_subnet.existing](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/subnet) | data source |
-| [aws_subnets.existing](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/subnets) | data source |
-| [aws_vpc.existing](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/vpc) | data source |
 
 ## Inputs
 
@@ -70,14 +67,15 @@ No modules.
 |------|-------------|------|---------|:--------:|
 | <a name="input_cluster_id"></a> [cluster\_id](#input\_cluster\_id) | CAST AI cluster ID | `string` | n/a | yes |
 | <a name="input_description"></a> [description](#input\_description) | Description of the edge location | `string` | `null` | no |
-| <a name="input_existing_subnet_ids"></a> [existing\_subnet\_ids](#input\_existing\_subnet\_ids) | List of subnet IDs from the existing VPC. Optional - if not provided, all subnets from the existing VPC will be automatically discovered | `list(string)` | `null` | no |
-| <a name="input_existing_vpc_id"></a> [existing\_vpc\_id](#input\_existing\_vpc\_id) | ID of existing VPC to use. If provided, no new VPC will be created | `string` | `null` | no |
+| <a name="input_existing_subnet_ids"></a> [existing\_subnet\_ids](#input\_existing\_subnet\_ids) | List of subnet IDs from the existing VPC. Required when existing\_vpc\_id is provided. Example: ["subnet-xxx", "subnet-yyy"] | `list(string)` | `null` | no |
+| <a name="input_existing_vpc_id"></a> [existing\_vpc\_id](#input\_existing\_vpc\_id) | ID of existing VPC to use. If not provided, a new VPC will be created. | `string` | `null` | no |
 | <a name="input_name"></a> [name](#input\_name) | Name for the edge location. If not provided, will be auto-generated | `string` | `null` | no |
 | <a name="input_organization_id"></a> [organization\_id](#input\_organization\_id) | CAST AI organization ID | `string` | n/a | yes |
 | <a name="input_region"></a> [region](#input\_region) | AWS region (must match AWS provider configuration) | `string` | n/a | yes |
 | <a name="input_security_group_source_cidr"></a> [security\_group\_source\_cidr](#input\_security\_group\_source\_cidr) | Source CIDR for security group ingress rules | `string` | `"0.0.0.0/0"` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags to apply to AWS resources | `map(string)` | `{}` | no |
 | <a name="input_vpc_cidr"></a> [vpc\_cidr](#input\_vpc\_cidr) | CIDR block for the VPC (only used when creating a new VPC) | `string` | `"10.0.0.0/16"` | no |
+| <a name="input_zones"></a> [zones](#input\_zones) | List of availability zones to use when creating a new VPC. Required when existing\_vpc\_id is not provided. When using existing VPC, zones are automatically discovered from existing\_subnet\_ids. | `list(string)` | `null` | no |
 
 ## Outputs
 

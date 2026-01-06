@@ -52,32 +52,41 @@ data "aws_caller_identity" "current" {}
 # Data source to get current AWS region from provider
 data "aws_region" "current" {}
 
-locals {
-  # Create subnet CIDR blocks (only used when creating new VPC)
-  subnet_cidrs = [
-    for idx in range(length(var.zones)) :
-    cidrsubnet(var.vpc_cidr, 8, idx)
-  ]
+# Query existing subnets to discover their zones
+data "aws_subnet" "existing" {
+  for_each = var.existing_vpc_id != null && var.existing_subnet_ids != null ? toset(var.existing_subnet_ids) : toset([])
+  id       = each.value
 }
 
 locals {
+  # Create subnet CIDR blocks (only used when creating new VPC)
+  subnet_cidrs = var.existing_vpc_id == null ? [
+    for idx in range(length(var.zones)) :
+    cidrsubnet(var.vpc_cidr, 8, idx)
+  ] : []
+
+  # Discovered zones from existing subnets
+  discovered_zones = var.existing_vpc_id != null ? [
+    for subnet in data.aws_subnet.existing : subnet.availability_zone
+  ] : []
+
+  zones_list = var.existing_vpc_id == null ? var.zones : local.discovered_zones
+
   new_vpc_subnet_ids = var.existing_vpc_id == null ? {
     for idx in range(length(aws_subnet.main)) :
     var.zones[idx] => aws_subnet.main[idx].id
   } : {}
 
-  existing_vpc_subnet_ids = var.existing_vpc_id != null ? (
-    var.existing_subnet_ids != null ? {
-      for idx in range(length(var.existing_subnet_ids)) :
-      var.zones[idx] => var.existing_subnet_ids[idx]
-    } : {}
-  ) : {}
+  existing_vpc_subnet_ids = var.existing_vpc_id != null ? {
+    for id, subnet in data.aws_subnet.existing :
+    subnet.availability_zone => id
+  } : {}
 
   subnet_ids = var.existing_vpc_id == null ? local.new_vpc_subnet_ids : local.existing_vpc_subnet_ids
 }
 
 data "aws_availability_zone" "zones" {
-  for_each = toset(var.zones)
+  for_each = toset(local.zones_list)
   name     = each.value
 }
 
@@ -305,7 +314,7 @@ resource "castai_edge_location" "this" {
   organization_id = var.organization_id
   description     = var.description != null ? var.description : local.default_description
   zones = [
-    for zone in var.zones : {
+    for zone in local.zones_list : {
       id   = data.aws_availability_zone.zones[zone].zone_id
       name = zone
     }
