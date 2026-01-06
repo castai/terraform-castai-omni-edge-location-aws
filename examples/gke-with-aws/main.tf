@@ -10,6 +10,10 @@ data "google_container_cluster" "gke" {
 
 data "aws_region" "current" {}
 
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
 # =============================================================================
 # Onboard cluster to CAST AI
 # =============================================================================
@@ -57,6 +61,7 @@ module "castai_aws_edge_location" {
   organization_id = module.castai-gke-cluster.organization_id
 
   region = data.aws_region.current.region
+  zones  = data.aws_availability_zones.available.names
 
   tags = {
     ManagedBy = "terraform"
@@ -85,8 +90,10 @@ module "castai_aws_edge_location_existing_vpc" {
   cluster_id      = module.castai-gke-cluster.cluster_id
   organization_id = module.castai-gke-cluster.organization_id
 
-  region          = data.aws_region.current.region
-  existing_vpc_id = module.vpc.vpc_id
+  region              = data.aws_region.current.region
+  existing_vpc_id     = module.vpc.vpc_id
+  existing_subnet_ids = module.vpc.public_subnets
+  zones               = module.vpc.azs
 
   tags = {
     ManagedBy = "terraform"

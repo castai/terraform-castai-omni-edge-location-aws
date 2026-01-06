@@ -1,19 +1,11 @@
 # AWS Edge Location for CAST AI
 
 locals {
-  # Extract VPC name from existing VPC tags or use vpc-id as fallback
-  existing_vpc_name = var.existing_vpc_id != null ? (
-    try(data.aws_vpc.existing[0].tags["Name"], null) != null ?
-      data.aws_vpc.existing[0].tags["Name"] :
-      var.existing_vpc_id
-  ) : null
-
   base_name = (
     var.name != null ? var.name :
-    var.existing_vpc_id != null ? "${local.existing_vpc_name}-${var.region}" :
+    var.existing_vpc_id != null ? "vpc-${substr(var.existing_vpc_id, -8, 8)}-${var.region}" :
     "aws-${var.region}"
   )
-
 
   # Final edge location name
   generated_name = (
@@ -45,9 +37,7 @@ locals {
   security_group_id = aws_security_group.main.id
 
   default_description = var.existing_vpc_id != null ? (
-    try(data.aws_vpc.existing[0].tags["Name"], null) != null ?
-      "AWS edge location onboarded by Terraform using existing VPC ${data.aws_vpc.existing[0].tags["Name"]} (${var.existing_vpc_id})" :
-      "AWS edge location onboarded by Terraform using existing VPC ${var.existing_vpc_id}"
+    "AWS edge location onboarded by Terraform using existing VPC ${var.existing_vpc_id}"
   ) : "AWS edge location onboarded by Terraform"
 }
 
@@ -62,71 +52,32 @@ data "aws_caller_identity" "current" {}
 # Data source to get current AWS region from provider
 data "aws_region" "current" {}
 
-# Data source to get all available zones in the region
-data "aws_availability_zones" "available" {
-  count = var.existing_vpc_id == null ? 1 : 0
-  state = "available"
-}
-
-# Data sources for existing VPC resources (when provided)
-data "aws_vpc" "existing" {
-  count = var.existing_vpc_id != null ? 1 : 0
-  id    = var.existing_vpc_id
-}
-
-# Get all subnet IDs in the existing VPC (when VPC is provided but subnet_ids are not)
-data "aws_subnets" "existing" {
-  count = var.existing_vpc_id != null && var.existing_subnet_ids == null ? 1 : 0
-
-  filter {
-    name   = "vpc-id"
-    values = [var.existing_vpc_id]
-  }
-}
-
 locals {
-  subnet_ids_to_lookup = (
-    var.existing_subnet_ids != null ? var.existing_subnet_ids :
-    var.existing_vpc_id != null ? data.aws_subnets.existing[0].ids :
-    []
-  )
-}
-
-data "aws_subnet" "existing" {
-  for_each = toset(local.subnet_ids_to_lookup)
-  id       = each.value
-}
-
-locals {
-  # Get available zones based on scenario:
-  # - New VPC: use all available zones in region
-  # - Existing VPC: derive directly from subnet data sources
-  available_zones = (
-    var.existing_vpc_id == null ? data.aws_availability_zones.available[0].names :
-    distinct([for subnet in data.aws_subnet.existing : subnet.availability_zone])
-  )
-
-  # Create subnet CIDR blocks
-  subnet_cidrs = var.existing_vpc_id == null ? [
-    for idx, zone in data.aws_availability_zones.available[0].names :
+  # Create subnet CIDR blocks (only used when creating new VPC)
+  subnet_cidrs = [
+    for idx in range(length(var.zones)) :
     cidrsubnet(var.vpc_cidr, 8, idx)
-  ] : []
+  ]
 }
 
 locals {
-  subnet_ids = (
-    length(local.subnet_ids_to_lookup) > 0 ? {
-      for subnet_id, subnet in data.aws_subnet.existing :
-      subnet.availability_zone => subnet.id
-    } : {
-      for idx, subnet in aws_subnet.main :
-      data.aws_availability_zones.available[0].names[idx] => subnet.id
-    }
-  )
+  new_vpc_subnet_ids = var.existing_vpc_id == null ? {
+    for idx in range(length(aws_subnet.main)) :
+    var.zones[idx] => aws_subnet.main[idx].id
+  } : {}
+
+  existing_vpc_subnet_ids = var.existing_vpc_id != null ? (
+    var.existing_subnet_ids != null ? {
+      for idx in range(length(var.existing_subnet_ids)) :
+      var.zones[idx] => var.existing_subnet_ids[idx]
+    } : {}
+  ) : {}
+
+  subnet_ids = var.existing_vpc_id == null ? local.new_vpc_subnet_ids : local.existing_vpc_subnet_ids
 }
 
 data "aws_availability_zone" "zones" {
-  for_each = toset(local.available_zones)
+  for_each = toset(var.zones)
   name     = each.value
 }
 
@@ -258,17 +209,17 @@ resource "aws_internet_gateway" "main" {
 }
 
 resource "aws_subnet" "main" {
-  count = var.existing_vpc_id == null ? length(local.available_zones) : 0
+  count = var.existing_vpc_id == null ? length(var.zones) : 0
 
   vpc_id                  = aws_vpc.main[0].id
   cidr_block              = local.subnet_cidrs[count.index]
-  availability_zone       = local.available_zones[count.index]
+  availability_zone       = var.zones[count.index]
   map_public_ip_on_launch = true
 
   tags = merge(
     local.common_tags,
     {
-      Name = "${local.resource_name}-${substr(local.available_zones[count.index], -1, 1)}"
+      Name = "${local.resource_name}-${substr(var.zones[count.index], -1, 1)}"
     }
   )
 }
@@ -354,7 +305,7 @@ resource "castai_edge_location" "this" {
   organization_id = var.organization_id
   description     = var.description != null ? var.description : local.default_description
   zones = [
-    for zone in local.available_zones : {
+    for zone in var.zones : {
       id   = data.aws_availability_zone.zones[zone].zone_id
       name = zone
     }

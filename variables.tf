@@ -31,6 +31,11 @@ variable "vpc_cidr" {
   default     = "10.0.0.0/16"
 }
 
+variable "zones" {
+  description = "List of availability zones to use. Required. When creating new VPC, subnets will be created in these zones. When using existing VPC, must match the zones of existing_subnet_ids."
+  type        = list(string)
+}
+
 variable "security_group_source_cidr" {
   description = "Source CIDR for security group ingress rules"
   type        = string
@@ -38,13 +43,13 @@ variable "security_group_source_cidr" {
 }
 
 variable "existing_vpc_id" {
-  description = "ID of existing VPC to use. If provided, no new VPC will be created"
+  description = "ID of existing VPC to use. If not provided, a new VPC will be created."
   type        = string
   default     = null
 }
 
 variable "existing_subnet_ids" {
-  description = "List of subnet IDs from the existing VPC. Optional - if not provided, all subnets from the existing VPC will be automatically discovered"
+  description = "List of subnet IDs from the existing VPC. Required when existing_vpc_id is provided. Must correspond to zones in the same order. Example: [\"subnet-xxx\", \"subnet-yyy\"]"
   type        = list(string)
   default     = null
 }
