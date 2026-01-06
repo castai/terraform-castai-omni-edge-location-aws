@@ -90,9 +90,9 @@ module "castai_aws_edge_location_existing_vpc" {
   cluster_id      = module.castai-gke-cluster.cluster_id
   organization_id = module.castai-gke-cluster.organization_id
 
-  region              = data.aws_region.current.region
-  existing_vpc_id     = module.vpc.vpc_id
-  existing_subnet_ids = module.vpc.public_subnets
+  region     = data.aws_region.current.region
+  vpc_id     = module.vpc.vpc_id
+  subnet_ids = module.vpc.public_subnets
 
   tags = {
     ManagedBy = "terraform"

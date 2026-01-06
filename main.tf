@@ -3,21 +3,21 @@
 locals {
   base_name = (
     var.name != null ? var.name :
-    var.existing_vpc_id != null ? "vpc-${substr(var.existing_vpc_id, -8, 8)}-${var.region}" :
+    var.vpc_id != null ? "vpc-${substr(var.vpc_id, -8, 8)}-${var.region}" :
     "aws-${var.region}"
   )
 
   # Final edge location name
   generated_name = (
     var.name != null ? substr(local.base_name, 0, 30) :
-    var.existing_vpc_id != null ? "${substr(local.base_name, 0, 21)}-${random_id.suffix.hex}" :
+    var.vpc_id != null ? "${substr(local.base_name, 0, 21)}-${random_id.suffix.hex}" :
     "${local.base_name}-${random_id.suffix.hex}"
   )
 
   # For AWS resources (IAM, security groups)
   sanitized_name = (
     var.name != null ? substr(local.base_name, 0, 35) :
-    var.existing_vpc_id != null ? "${substr(local.base_name, 0, 26)}-${random_id.suffix.hex}" :
+    var.vpc_id != null ? "${substr(local.base_name, 0, 26)}-${random_id.suffix.hex}" :
     "${local.base_name}-${random_id.suffix.hex}"
   )
 
@@ -33,11 +33,11 @@ locals {
     }
   )
 
-  vpc_id            = var.existing_vpc_id != null ? var.existing_vpc_id : aws_vpc.main[0].id
+  vpc_id            = var.vpc_id != null ? var.vpc_id : aws_vpc.main[0].id
   security_group_id = aws_security_group.main.id
 
-  default_description = var.existing_vpc_id != null ? (
-    "AWS edge location onboarded by Terraform using existing VPC ${var.existing_vpc_id}"
+  default_description = var.vpc_id != null ? (
+    "AWS edge location onboarded by Terraform using existing VPC ${var.vpc_id}"
   ) : "AWS edge location onboarded by Terraform"
 }
 
@@ -54,35 +54,35 @@ data "aws_region" "current" {}
 
 # Query existing subnets to discover their zones
 data "aws_subnet" "existing" {
-  for_each = var.existing_vpc_id != null && var.existing_subnet_ids != null ? toset(var.existing_subnet_ids) : toset([])
+  for_each = var.vpc_id != null && var.subnet_ids != null ? toset(var.subnet_ids) : toset([])
   id       = each.value
 }
 
 locals {
   # Create subnet CIDR blocks (only used when creating new VPC)
-  subnet_cidrs = var.existing_vpc_id == null ? [
+  subnet_cidrs = var.vpc_id == null ? [
     for idx in range(length(var.zones)) :
     cidrsubnet(var.vpc_cidr, 8, idx)
   ] : []
 
   # Discovered zones from existing subnets
-  discovered_zones = var.existing_vpc_id != null ? [
+  discovered_zones = var.vpc_id != null ? [
     for subnet in data.aws_subnet.existing : subnet.availability_zone
   ] : []
 
-  zones_list = var.existing_vpc_id == null ? var.zones : local.discovered_zones
+  zones_list = var.vpc_id == null ? var.zones : local.discovered_zones
 
-  new_vpc_subnet_ids = var.existing_vpc_id == null ? {
+  new_vpc_subnet_ids = var.vpc_id == null ? {
     for idx in range(length(aws_subnet.main)) :
     var.zones[idx] => aws_subnet.main[idx].id
   } : {}
 
-  existing_vpc_subnet_ids = var.existing_vpc_id != null ? {
+  existing_vpc_subnet_ids = var.vpc_id != null ? {
     for id, subnet in data.aws_subnet.existing :
     subnet.availability_zone => id
   } : {}
 
-  subnet_ids = var.existing_vpc_id == null ? local.new_vpc_subnet_ids : local.existing_vpc_subnet_ids
+  subnet_ids_map = var.vpc_id == null ? local.new_vpc_subnet_ids : local.existing_vpc_subnet_ids
 }
 
 data "aws_availability_zone" "zones" {
@@ -99,18 +99,18 @@ resource "null_resource" "validate" {
     }
 
     precondition {
-      condition     = var.existing_vpc_id == null || var.existing_subnet_ids != null
-      error_message = "existing_subnet_ids must be provided when existing_vpc_id is specified."
+      condition     = var.vpc_id == null || var.subnet_ids != null
+      error_message = "subnet_ids must be provided when vpc_id is specified."
     }
 
     precondition {
-      condition     = var.existing_subnet_ids == null || var.existing_vpc_id != null
-      error_message = "existing_vpc_id must be provided when existing_subnet_ids is specified."
+      condition     = var.subnet_ids == null || var.vpc_id != null
+      error_message = "vpc_id must be provided when subnet_ids is specified."
     }
 
     precondition {
-      condition     = var.existing_vpc_id != null || (var.zones != null && length(var.zones) > 0)
-      error_message = "zones must be provided when creating a new VPC (existing_vpc_id is not provided)."
+      condition     = var.vpc_id != null || (var.zones != null && length(var.zones) > 0)
+      error_message = "zones must be provided when creating a new VPC (vpc_id is not provided)."
     }
   }
 }
@@ -215,7 +215,7 @@ resource "aws_iam_access_key" "castai" {
 # =============================================================================
 
 resource "aws_vpc" "main" {
-  count = var.existing_vpc_id == null ? 1 : 0
+  count = var.vpc_id == null ? 1 : 0
 
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
@@ -225,7 +225,7 @@ resource "aws_vpc" "main" {
 }
 
 resource "aws_internet_gateway" "main" {
-  count = var.existing_vpc_id == null ? 1 : 0
+  count = var.vpc_id == null ? 1 : 0
 
   vpc_id = aws_vpc.main[0].id
 
@@ -233,7 +233,7 @@ resource "aws_internet_gateway" "main" {
 }
 
 resource "aws_subnet" "main" {
-  count = var.existing_vpc_id == null ? length(var.zones) : 0
+  count = var.vpc_id == null ? length(var.zones) : 0
 
   vpc_id                  = aws_vpc.main[0].id
   cidr_block              = local.subnet_cidrs[count.index]
@@ -249,7 +249,7 @@ resource "aws_subnet" "main" {
 }
 
 resource "aws_route_table" "main" {
-  count = var.existing_vpc_id == null ? 1 : 0
+  count = var.vpc_id == null ? 1 : 0
 
   vpc_id = aws_vpc.main[0].id
 
@@ -257,7 +257,7 @@ resource "aws_route_table" "main" {
 }
 
 resource "aws_route" "internet" {
-  count = var.existing_vpc_id == null ? 1 : 0
+  count = var.vpc_id == null ? 1 : 0
 
   route_table_id         = aws_route_table.main[0].id
   destination_cidr_block = "0.0.0.0/0"
@@ -342,7 +342,7 @@ resource "castai_edge_location" "this" {
     secret_access_key_wo = aws_iam_access_key.castai.secret
     vpc_id               = local.vpc_id
     security_group_id    = local.security_group_id
-    subnet_ids           = local.subnet_ids
+    subnet_ids           = local.subnet_ids_map
     name_tag             = local.resource_name
   }
 }

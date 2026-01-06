@@ -32,7 +32,7 @@ variable "vpc_cidr" {
 }
 
 variable "zones" {
-  description = "List of availability zones to use when creating a new VPC. Required when existing_vpc_id is not provided. When using existing VPC, zones are automatically discovered from existing_subnet_ids."
+  description = "List of availability zones to use when creating a new VPC. Required when vpc_id is not provided. When using existing VPC, zones are automatically discovered from subnet_ids."
   type        = list(string)
   default     = null
 }
@@ -43,14 +43,14 @@ variable "security_group_source_cidr" {
   default     = "0.0.0.0/0"
 }
 
-variable "existing_vpc_id" {
+variable "vpc_id" {
   description = "ID of existing VPC to use. If not provided, a new VPC will be created."
   type        = string
   default     = null
 }
 
-variable "existing_subnet_ids" {
-  description = "List of subnet IDs from the existing VPC. Required when existing_vpc_id is provided. Example: [\"subnet-xxx\", \"subnet-yyy\"]"
+variable "subnet_ids" {
+  description = "List of subnet IDs from the existing VPC. Required when vpc_id is provided. Example: [\"subnet-xxx\", \"subnet-yyy\"]"
   type        = list(string)
   default     = null
 }

@@ -14,6 +14,6 @@ output "aws_resources" {
     account_id        = data.aws_caller_identity.current.account_id
     vpc_id            = local.vpc_id
     security_group_id = local.security_group_id
-    subnet_ids        = local.subnet_ids
+    subnet_ids        = local.subnet_ids_map
   }
 }
