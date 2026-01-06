@@ -90,12 +90,27 @@ data "aws_availability_zone" "zones" {
   name     = each.value
 }
 
-# Validation: Ensure the input region matches the AWS provider's configured region
-resource "null_resource" "validate_region" {
+# Validations
+resource "null_resource" "validate" {
   lifecycle {
     precondition {
       condition     = var.region == data.aws_region.current.region
       error_message = "The input region '${var.region}' does not match the AWS provider's configured region '${data.aws_region.current.region}'. Ensure the AWS provider region matches the input region parameter."
+    }
+
+    precondition {
+      condition     = var.existing_vpc_id == null || var.existing_subnet_ids != null
+      error_message = "existing_subnet_ids must be provided when existing_vpc_id is specified."
+    }
+
+    precondition {
+      condition     = var.existing_subnet_ids == null || var.existing_vpc_id != null
+      error_message = "existing_vpc_id must be provided when existing_subnet_ids is specified."
+    }
+
+    precondition {
+      condition     = var.existing_vpc_id != null || (var.zones != null && length(var.zones) > 0)
+      error_message = "zones must be provided when creating a new VPC (existing_vpc_id is not provided)."
     }
   }
 }
