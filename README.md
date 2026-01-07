@@ -59,7 +59,6 @@ No modules.
 | [aws_availability_zone.zones](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/availability_zone) | data source |
 | [aws_caller_identity.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/caller_identity) | data source |
 | [aws_region.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/region) | data source |
-| [aws_subnet.existing](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/subnet) | data source |
 
 ## Inputs
 
@@ -75,7 +74,7 @@ No modules.
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags to apply to AWS resources | `map(string)` | `{}` | no |
 | <a name="input_vpc_cidr"></a> [vpc\_cidr](#input\_vpc\_cidr) | CIDR block for the VPC (only used when creating a new VPC) | `string` | `"10.0.0.0/16"` | no |
 | <a name="input_vpc_id"></a> [vpc\_id](#input\_vpc\_id) | ID of existing VPC to use. If not provided, a new VPC will be created. | `string` | `null` | no |
-| <a name="input_zones"></a> [zones](#input\_zones) | List of availability zones to use when creating a new VPC. Required when vpc\_id is not provided. When using existing VPC, zones are automatically discovered from subnet\_ids. | `list(string)` | `null` | no |
+| <a name="input_zones"></a> [zones](#input\_zones) | List of availability zones. When creating a new VPC, subnets will be created in these zones. When using existing VPC, must match the zones of the provided subnet\_ids (in the same order). | `list(string)` | n/a | yes |
 
 ## Outputs
 
