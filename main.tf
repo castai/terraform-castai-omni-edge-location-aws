@@ -1,24 +1,28 @@
 # AWS Edge Location for CAST AI
 
 locals {
-  # Generate name if not provided (with random suffix)
-  generated_name = var.name != null ? var.name : "aws-${var.region}-${random_id.suffix.hex}"
+  base_name = (
+    var.name != null ? var.name :
+    var.vpc_id != null ? "vpc-${substr(var.vpc_id, -8, 8)}-${var.region}" :
+    "aws-${var.region}"
+  )
 
-  # Sanitize name for AWS resource naming (max 35 chars for parts of names)
-  sanitized_name = substr(replace(local.generated_name, "/[^a-zA-Z0-9_-]/", ""), 0, 35)
+  # Final edge location name
+  generated_name = (
+    var.name != null ? substr(local.base_name, 0, 30) :
+    var.vpc_id != null ? "${substr(local.base_name, 0, 21)}-${random_id.suffix.hex}" :
+    "${local.base_name}-${random_id.suffix.hex}"
+  )
+
+  # For AWS resources (IAM, security groups)
+  sanitized_name = (
+    var.name != null ? substr(local.base_name, 0, 35) :
+    var.vpc_id != null ? "${substr(local.base_name, 0, 26)}-${random_id.suffix.hex}" :
+    "${local.base_name}-${random_id.suffix.hex}"
+  )
 
   # Full resource name with prefix
   resource_name = "castai-omni-${local.sanitized_name}"
-
-  # Get all available zones in the region
-  available_zones = data.aws_availability_zones.available.names
-
-  # Create subnet CIDR blocks (/24 subnets from VPC /16)
-  # Simple sequential allocation: 10.0.0.0/24, 10.0.1.0/24, 10.0.2.0/24, etc.
-  subnet_cidrs = [
-    for idx, zone in local.available_zones :
-    cidrsubnet(var.vpc_cidr, 8, idx)
-  ]
 
   # Common tags merged once and reused across all resources
   common_tags = merge(
@@ -28,6 +32,13 @@ locals {
       "cast-omni:cluster-id" = var.cluster_id
     }
   )
+
+  vpc_id            = var.subnet_ids != null ? var.vpc_id : aws_vpc.main[0].id
+  security_group_id = aws_security_group.main.id
+
+  default_description = var.subnet_ids != null ? (
+    "AWS edge location onboarded by Terraform using existing VPC ${var.vpc_id}"
+  ) : "AWS edge location onboarded by Terraform"
 }
 
 # Generate random suffix for edge location name
@@ -41,23 +52,53 @@ data "aws_caller_identity" "current" {}
 # Data source to get current AWS region from provider
 data "aws_region" "current" {}
 
-# Data source to get all available zones in the region
-data "aws_availability_zones" "available" {
-  state = "available"
+locals {
+  # Create subnet CIDR blocks (only used when creating new VPC)
+  subnet_cidrs = var.subnet_ids == null ? [
+    for idx in range(length(var.zones)) :
+    cidrsubnet(var.vpc_cidr, 8, idx)
+  ] : []
+
+  # Map zones to subnet IDs
+  new_vpc_subnet_ids = var.subnet_ids == null ? {
+    for idx in range(length(aws_subnet.main)) :
+    var.zones[idx] => aws_subnet.main[idx].id
+  } : {}
+
+  existing_vpc_subnet_ids = var.subnet_ids != null ? {
+    for idx in range(length(var.zones)) :
+    var.zones[idx] => var.subnet_ids[idx]
+  } : {}
+
+  subnet_ids_map = var.subnet_ids == null ? local.new_vpc_subnet_ids : local.existing_vpc_subnet_ids
 }
 
-# Data source to get zone details including zone IDs
 data "aws_availability_zone" "zones" {
-  for_each = toset(local.available_zones)
+  for_each = toset(var.zones)
   name     = each.value
 }
 
-# Validation: Ensure the input region matches the AWS provider's configured region
-resource "null_resource" "validate_region" {
+# Validations
+resource "null_resource" "validate" {
   lifecycle {
     precondition {
       condition     = var.region == data.aws_region.current.region
       error_message = "The input region '${var.region}' does not match the AWS provider's configured region '${data.aws_region.current.region}'. Ensure the AWS provider region matches the input region parameter."
+    }
+
+    precondition {
+      condition     = var.vpc_id == null || var.subnet_ids != null
+      error_message = "subnet_ids must be provided when vpc_id is specified."
+    }
+
+    precondition {
+      condition     = var.subnet_ids == null || var.vpc_id != null
+      error_message = "vpc_id must be provided when subnet_ids is specified."
+    }
+
+    precondition {
+      condition     = var.vpc_id == null || length(var.zones) == length(var.subnet_ids)
+      error_message = "The number of zones must match the number of subnet_ids when using an existing VPC."
     }
   }
 }
@@ -161,8 +202,9 @@ resource "aws_iam_access_key" "castai" {
 # VPC and Networking
 # =============================================================================
 
-# VPC
 resource "aws_vpc" "main" {
+  count = var.subnet_ids == null ? 1 : 0
+
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
   enable_dns_support   = true
@@ -170,50 +212,51 @@ resource "aws_vpc" "main" {
   tags = local.common_tags
 }
 
-# Internet Gateway
 resource "aws_internet_gateway" "main" {
-  vpc_id = aws_vpc.main.id
+  count = var.subnet_ids == null ? 1 : 0
+
+  vpc_id = aws_vpc.main[0].id
 
   tags = local.common_tags
 }
 
-# Subnets (one per availability zone)
 resource "aws_subnet" "main" {
-  count = length(local.available_zones)
+  count = var.subnet_ids == null ? length(var.zones) : 0
 
-  vpc_id                  = aws_vpc.main.id
+  vpc_id                  = aws_vpc.main[0].id
   cidr_block              = local.subnet_cidrs[count.index]
-  availability_zone       = local.available_zones[count.index]
+  availability_zone       = var.zones[count.index]
   map_public_ip_on_launch = true
 
   tags = merge(
     local.common_tags,
     {
-      Name = "${local.resource_name}-${substr(local.available_zones[count.index], -1, 1)}"
+      Name = "${local.resource_name}-${substr(var.zones[count.index], -1, 1)}"
     }
   )
 }
 
-# Route Table
 resource "aws_route_table" "main" {
-  vpc_id = aws_vpc.main.id
+  count = var.subnet_ids == null ? 1 : 0
+
+  vpc_id = aws_vpc.main[0].id
 
   tags = local.common_tags
 }
 
-# Route to Internet Gateway
 resource "aws_route" "internet" {
-  route_table_id         = aws_route_table.main.id
+  count = var.subnet_ids == null ? 1 : 0
+
+  route_table_id         = aws_route_table.main[0].id
   destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.main.id
+  gateway_id             = aws_internet_gateway.main[0].id
 }
 
-# Associate route table with subnets
 resource "aws_route_table_association" "main" {
   count = length(aws_subnet.main)
 
   subnet_id      = aws_subnet.main[count.index].id
-  route_table_id = aws_route_table.main.id
+  route_table_id = aws_route_table.main[0].id
 }
 
 # =============================================================================
@@ -223,7 +266,7 @@ resource "aws_route_table_association" "main" {
 resource "aws_security_group" "main" {
   name        = local.resource_name
   description = "Custom Security Group with specific ports"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = local.vpc_id
 
   # TCP ports: 443, 6443
   ingress {
@@ -272,9 +315,9 @@ resource "castai_edge_location" "this" {
   region          = var.region
   cluster_id      = var.cluster_id
   organization_id = var.organization_id
-  description     = var.description != null ? var.description : "AWS edge location onboarded by Terraform"
+  description     = var.description != null ? var.description : local.default_description
   zones = [
-    for zone in local.available_zones : {
+    for zone in var.zones : {
       id   = data.aws_availability_zone.zones[zone].zone_id
       name = zone
     }
@@ -285,12 +328,9 @@ resource "castai_edge_location" "this" {
     account_id           = data.aws_caller_identity.current.account_id
     access_key_id_wo     = aws_iam_access_key.castai.id
     secret_access_key_wo = aws_iam_access_key.castai.secret
-    vpc_id               = aws_vpc.main.id
-    security_group_id    = aws_security_group.main.id
-    subnet_ids = {
-      for idx, subnet in aws_subnet.main :
-      local.available_zones[idx] => subnet.id
-    }
-    name_tag = local.resource_name
+    vpc_id               = local.vpc_id
+    security_group_id    = local.security_group_id
+    subnet_ids           = local.subnet_ids_map
+    name_tag             = local.resource_name
   }
 }
