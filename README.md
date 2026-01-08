@@ -8,6 +8,10 @@ Terraform module for creating CAST AI edge locations on AWS.
 > This module expects the cluster to be onboarded to CAST AI with OMNI enabled.
 
 ```hcl
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
 module "castai_aws_edge_location" {
   source  = "castai/omni-edge-location-aws/castai"
   version = "~> 1.0"
@@ -15,6 +19,7 @@ module "castai_aws_edge_location" {
   cluster_id      = var.cluster_id
   organization_id = var.organization_id
   region          = "us-east-1"
+  zones           = data.aws_availability_zones.available.names
 
   tags = {
     ManagedBy = "terraform"
