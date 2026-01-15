@@ -97,7 +97,9 @@ resource "null_resource" "validate" {
     }
 
     precondition {
-      condition     = var.vpc_id == null || length(var.zones) == length(var.subnet_ids)
+      condition = (
+        var.vpc_id == null || length(coalesce(var.zones, [])) == length(coalesce(var.subnet_ids, []))
+      )
       error_message = "The number of zones must match the number of subnet_ids when using an existing VPC."
     }
   }
