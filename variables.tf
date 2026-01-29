@@ -48,6 +48,12 @@ variable "vpc_id" {
   default     = null
 }
 
+variable "vpc_peered" {
+  description = "Whether existing PVC is peered with main cluster's VPC. Field is ignored if vpc_id is not provided or main cluster is not EKS"
+  type        = bool
+  default     = false
+}
+
 variable "subnet_ids" {
   description = "List of subnet IDs from the existing VPC. Required when vpc_id is provided. Example: [\"subnet-xxx\", \"subnet-yyy\"]"
   type        = list(string)

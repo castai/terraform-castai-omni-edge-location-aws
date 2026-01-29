@@ -323,6 +323,7 @@ resource "castai_edge_location" "this" {
     access_key_id_wo     = aws_iam_access_key.castai.id
     secret_access_key_wo = aws_iam_access_key.castai.secret
     vpc_id               = local.vpc_id
+    vpc_peered           = var.vpc_peered
     security_group_id    = local.security_group_id
     subnet_ids           = local.subnet_ids_map
     name_tag             = local.resource_name
