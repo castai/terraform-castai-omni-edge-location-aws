@@ -49,7 +49,7 @@ variable "vpc_id" {
 }
 
 variable "vpc_peered" {
-  description = "Whether existing PVC is peered with main cluster's VPC. Field is ignored if vpc_id is not provided or main cluster is not EKS"
+  description = "Whether existing VPC is peered with main cluster's VPC. Field is ignored if vpc_id is not provided or main cluster is not EKS"
   type        = bool
   default     = false
 }
