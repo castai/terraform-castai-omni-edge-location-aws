@@ -35,7 +35,7 @@ module "castai_aws_edge_location" {
 |------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.0 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 4.0 |
-| <a name="requirement_castai"></a> [castai](#requirement\_castai) | >= 8.1.1 |
+| <a name="requirement_castai"></a> [castai](#requirement\_castai) | >= 8.12.0 |
 | <a name="requirement_null"></a> [null](#requirement\_null) | >= 3.0 |
 | <a name="requirement_random"></a> [random](#requirement\_random) | >= 3.0 |
 
@@ -79,7 +79,7 @@ No modules.
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags to apply to AWS resources | `map(string)` | `{}` | no |
 | <a name="input_vpc_cidr"></a> [vpc\_cidr](#input\_vpc\_cidr) | CIDR block for the VPC (only used when creating a new VPC) | `string` | `"10.0.0.0/16"` | no |
 | <a name="input_vpc_id"></a> [vpc\_id](#input\_vpc\_id) | ID of existing VPC to use. If not provided, a new VPC will be created. | `string` | `null` | no |
-| <a name="input_vpc_peered"></a> [vpc\_peered](#input\_vpc\_peered) | Whether existing PVC is peered with main cluster's VPC. Field is ignored if vpc\_id is not provided or main cluster is not EKS | `bool` | `false` | no |
+| <a name="input_vpc_peered"></a> [vpc\_peered](#input\_vpc\_peered) | Whether existing VPC is peered with main cluster's VPC. Field is ignored if vpc\_id is not provided or main cluster is not EKS | `bool` | `false` | no |
 | <a name="input_zones"></a> [zones](#input\_zones) | List of availability zones. When creating a new VPC, subnets will be created in these zones. When using existing VPC, must match the zones of the provided subnet\_ids (in the same order). | `list(string)` | n/a | yes |
 
 ## Outputs
