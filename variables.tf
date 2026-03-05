@@ -60,6 +60,12 @@ variable "subnet_ids" {
   default     = null
 }
 
+variable "instance_profile" {
+  description = "AWS IAM instance profile ARN to be attached to edge instances. It can be used to grant permissions to access other AWS resources such as ECR."
+  type        = string
+  default     = null
+}
+
 variable "tags" {
   description = "Tags to apply to AWS resources"
   type        = map(string)

@@ -320,6 +320,7 @@ resource "castai_edge_location" "this" {
   # AWS cloud provider configuration
   aws = {
     account_id           = data.aws_caller_identity.current.account_id
+    instance_profile     = var.instance_profile
     access_key_id_wo     = aws_iam_access_key.castai.id
     secret_access_key_wo = aws_iam_access_key.castai.secret
     vpc_id               = local.vpc_id
