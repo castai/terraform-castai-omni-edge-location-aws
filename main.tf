@@ -351,4 +351,11 @@ resource "castai_edge_location" "this" {
     security_group_id = local.security_group_id
     subnet_ids        = local.subnet_ids_map
   }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.castai,
+    aws_nat_gateway.main,
+    aws_route.nat,
+    aws_route_table_association.main,
+  ]
 }

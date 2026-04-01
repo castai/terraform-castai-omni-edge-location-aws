@@ -102,5 +102,5 @@ module "castai_aws_edge_location_existing_vpc" {
   tags = {
     ManagedBy = "terraform"
   }
-  depends_on = [module.castai-gke-cluster]
+  depends_on = [module.castai-gke-cluster, module.vpc]
 }
