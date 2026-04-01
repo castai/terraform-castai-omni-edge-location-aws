@@ -65,3 +65,14 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "control_plane" {
+  description = <<-EOT
+    Edge location control plane configuration.
+    - ha (bool): enable high availability mode for the Edge location control plane (default: true)
+  EOT
+  type = object({
+    ha = optional(bool, true)
+  })
+  default = {}
+}
