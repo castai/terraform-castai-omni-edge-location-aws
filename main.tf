@@ -326,11 +326,12 @@ resource "aws_security_group" "main" {
 # =============================================================================
 
 resource "castai_edge_location" "this" {
-  name            = local.generated_name
-  region          = var.region
-  cluster_id      = var.cluster_id
-  organization_id = var.organization_id
-  description     = var.description != null ? var.description : local.default_description
+  name               = local.generated_name
+  region             = var.region
+  cluster_id         = var.cluster_id
+  organization_id    = var.organization_id
+  control_plane_mode = "SHARED"
+  description        = var.description != null ? var.description : local.default_description
   zones = [
     for zone in var.zones : {
       id   = data.aws_availability_zone.zones[zone].zone_id
