@@ -78,6 +78,11 @@ data "aws_availability_zone" "zones" {
   name     = each.value
 }
 
+data "castai_omni_cluster" "this" {
+  organization_id = var.organization_id
+  cluster_id      = var.cluster_id
+}
+
 # Validations
 resource "null_resource" "validate" {
   lifecycle {
@@ -124,7 +129,7 @@ resource "aws_iam_role" "castai" {
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
-            "accounts.google.com:sub"  = var.castai_gcp_service_account_unique_id
+            "accounts.google.com:sub"  = data.castai_omni_cluster.this.castai_oidc_config.gcp_service_account_unique_id
             "accounts.google.com:oaud" = "sts.amazonaws.com/${var.cluster_id}"
           }
         }

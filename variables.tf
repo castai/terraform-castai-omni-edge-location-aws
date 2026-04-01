@@ -60,11 +60,6 @@ variable "instance_profile" {
   default     = null
 }
 
-variable "castai_gcp_service_account_unique_id" {
-  description = "Google Cloud service account unique ID used for OIDC federation trust policy"
-  type        = string
-}
-
 variable "tags" {
   description = "Tags to apply to AWS resources"
   type        = map(string)
