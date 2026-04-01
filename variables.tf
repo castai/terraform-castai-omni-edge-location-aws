@@ -36,12 +36,6 @@ variable "zones" {
   type        = list(string)
 }
 
-variable "security_group_source_cidr" {
-  description = "Source CIDR for security group ingress rules"
-  type        = string
-  default     = "0.0.0.0/0"
-}
-
 variable "vpc_id" {
   description = "ID of existing VPC to use. If not provided, a new VPC will be created."
   type        = string
@@ -64,6 +58,11 @@ variable "instance_profile" {
   description = "AWS IAM instance profile ARN to be attached to edge instances. It can be used to grant permissions to access other AWS resources such as ECR."
   type        = string
   default     = null
+}
+
+variable "castai_gcp_service_account_unique_id" {
+  description = "Google Cloud service account unique ID used for OIDC federation trust policy"
+  type        = string
 }
 
 variable "tags" {

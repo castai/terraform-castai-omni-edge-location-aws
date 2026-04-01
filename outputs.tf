@@ -8,6 +8,11 @@ output "edge_location_name" {
   value       = castai_edge_location.this.name
 }
 
+output "role_arn" {
+  description = "IAM role ARN used for CAST AI OIDC federation"
+  value       = aws_iam_role.castai.arn
+}
+
 output "aws_resources" {
   description = "AWS resources used for the edge location"
   value = {
