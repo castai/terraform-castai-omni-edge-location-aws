@@ -2,6 +2,42 @@
 
 Terraform module for creating CAST AI edge locations on AWS.
 
+## Breaking changes in v2
+
+v2 is not backwards compatible with v1. Upgrading requires destroying the v1 edge location and creating a new one with v2.
+
+Both versions can run simultaneously. During migration, create counterpart v2 edge locations first, then remove v1 once they are no longer in use.
+
+**Note: creating new v1 edge locations will no longer be supported.**
+
+### Running v1 and v2 simultaneously
+
+Pin existing edge locations to v1 while creating new ones with v2:
+
+```hcl
+# Keep existing edge location on v1
+module "castai_aws_edge_location_existing" {
+  source  = "castai/omni-edge-location-aws/castai"
+  version = "~> 1.0"
+
+  cluster_id      = var.cluster_id
+  organization_id = var.organization_id
+  region          = "us-east-1"
+  zones           = data.aws_availability_zones.available.names
+}
+
+# New edge location on v2
+module "castai_aws_edge_location_new" {
+  source  = "castai/omni-edge-location-aws/castai"
+  version = "~> 2.0"
+
+  cluster_id      = var.cluster_id
+  organization_id = var.organization_id
+  region          = "eu-west-1"
+  zones           = data.aws_availability_zones.eu_west.names
+}
+```
+
 ## Usage
 
 > **Warning**
@@ -14,7 +50,7 @@ data "aws_availability_zones" "available" {
 
 module "castai_aws_edge_location" {
   source  = "castai/omni-edge-location-aws/castai"
-  version = "~> 1.0"
+  version = "~> 2.0"
 
   cluster_id      = var.cluster_id
   organization_id = var.organization_id
