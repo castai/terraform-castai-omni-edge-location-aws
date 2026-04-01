@@ -73,6 +73,7 @@ module "castai_aws_edge_location" {
 # =============================================================================
 # Edge location with existing vpc
 # =============================================================================
+# Note: castai_aws_edge_location module expects that existing vpc has egress traffic setup.
 
 module "vpc" {
   source = "terraform-aws-modules/vpc/aws"
