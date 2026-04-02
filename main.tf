@@ -78,6 +78,11 @@ data "aws_availability_zone" "zones" {
   name     = each.value
 }
 
+data "castai_omni_cluster" "this" {
+  organization_id = var.organization_id
+  cluster_id      = var.cluster_id
+}
+
 # Validations
 resource "null_resource" "validate" {
   lifecycle {
@@ -106,12 +111,31 @@ resource "null_resource" "validate" {
 }
 
 # =============================================================================
-# IAM User and Policies
+# IAM Role and Policies
 # =============================================================================
 
-# IAM User for CAST AI
-resource "aws_iam_user" "castai" {
+# IAM Role with Google OIDC federation trust policy
+resource "aws_iam_role" "castai" {
   name = local.resource_name
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Federated = "accounts.google.com"
+        }
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "accounts.google.com:sub"  = data.castai_omni_cluster.this.castai_oidc_config.gcp_service_account_unique_id
+            "accounts.google.com:oaud" = "sts.amazonaws.com/${var.cluster_id}"
+          }
+        }
+      }
+    ]
+  })
 
   tags = local.common_tags
 }
@@ -125,79 +149,70 @@ resource "aws_iam_policy" "castai" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "CastAIReadPermissions"
         Effect = "Allow"
         Action = [
-          "ec2:DescribeAccountAttributes",
-          "ec2:DescribeAddresses",
-          "ec2:DescribeAvailabilityZones",
-          "ec2:DescribeImages",
-          "ec2:DescribeInstanceStatus",
           "ec2:DescribeInstances",
-          "ec2:DescribeInstanceTypes",
+          "ec2:DescribeImages",
+          "ec2:DescribeVolumes",
+          "ec2:DescribeSnapshots",
           "ec2:DescribeKeyPairs",
-          "ec2:DescribeNetworkInterfaces",
-          "ec2:DescribeRegions",
           "ec2:DescribeSecurityGroups",
           "ec2:DescribeSubnets",
-          "ec2:DescribeTags",
-          "ec2:DescribeVolumes",
           "ec2:DescribeVpcs",
-          "ec2:DescribeInternetGateways",
+          "ec2:DescribeNatGateways",
           "ec2:DescribeRouteTables",
-          "iam:ListInstanceProfiles",
-          "iam:ListRoles"
+          "ec2:DescribeAvailabilityZones",
+          "ec2:DescribeInstanceTypes",
+          "ec2:DescribeInstanceTypeOfferings",
+          "ec2:DescribeTags",
         ]
         Resource = "*"
       },
       {
-        Sid    = "CastAIVMManagement"
         Effect = "Allow"
         Action = [
           "ec2:RunInstances",
           "ec2:TerminateInstances",
-          "ec2:StopInstances",
           "ec2:StartInstances",
+          "ec2:StopInstances",
           "ec2:RebootInstances",
-          "ec2:CreateTags",
-          "ec2:DeleteTags"
+          "ec2:ModifyNetworkInterfaceAttribute",
         ]
         Resource = "*"
       },
       {
-        Sid    = "CastAIVolumeManagement"
         Effect = "Allow"
         Action = [
           "ec2:CreateVolume",
           "ec2:DeleteVolume",
           "ec2:AttachVolume",
-          "ec2:DetachVolume"
+          "ec2:DetachVolume",
         ]
         Resource = "*"
       },
       {
-        Sid      = "CastAIPassRole"
+        Effect = "Allow"
+        Action = [
+          "ec2:CreateTags",
+          "ec2:DeleteTags",
+        ]
+        Resource = "*"
+      },
+      {
         Effect   = "Allow"
         Action   = ["iam:PassRole"]
         Resource = "*"
-      }
+      },
     ]
   })
 
   tags = local.common_tags
 }
 
-# Attach policy to user
-resource "aws_iam_user_policy_attachment" "castai" {
-  user       = aws_iam_user.castai.name
+# Attach policy to role
+resource "aws_iam_role_policy_attachment" "castai" {
+  role       = aws_iam_role.castai.name
   policy_arn = aws_iam_policy.castai.arn
-}
-
-# Create access key for the user
-resource "aws_iam_access_key" "castai" {
-  user = aws_iam_user.castai.name
-
-  depends_on = [aws_iam_user_policy_attachment.castai]
 }
 
 # =============================================================================
@@ -225,17 +240,27 @@ resource "aws_internet_gateway" "main" {
 resource "aws_subnet" "main" {
   count = var.subnet_ids == null ? length(var.zones) : 0
 
-  vpc_id                  = aws_vpc.main[0].id
-  cidr_block              = local.subnet_cidrs[count.index]
-  availability_zone       = var.zones[count.index]
-  map_public_ip_on_launch = true
+  vpc_id            = aws_vpc.main[0].id
+  cidr_block        = local.subnet_cidrs[count.index]
+  availability_zone = var.zones[count.index]
 
   tags = merge(
     local.common_tags,
     {
-      Name = "${local.resource_name}-${substr(var.zones[count.index], -1, 1)}"
+      Name = "${local.resource_name}-private-${var.zones[count.index]}"
     }
   )
+}
+
+resource "aws_nat_gateway" "main" {
+  count = var.subnet_ids == null ? 1 : 0
+
+  vpc_id            = aws_vpc.main[0].id
+  availability_mode = "regional"
+
+  tags = local.common_tags
+
+  depends_on = [aws_internet_gateway.main]
 }
 
 resource "aws_route_table" "main" {
@@ -243,15 +268,20 @@ resource "aws_route_table" "main" {
 
   vpc_id = aws_vpc.main[0].id
 
-  tags = local.common_tags
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.resource_name}-private"
+    }
+  )
 }
 
-resource "aws_route" "internet" {
+resource "aws_route" "nat" {
   count = var.subnet_ids == null ? 1 : 0
 
   route_table_id         = aws_route_table.main[0].id
   destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.main[0].id
+  nat_gateway_id         = aws_nat_gateway.main[0].id
 }
 
 resource "aws_route_table_association" "main" {
@@ -267,25 +297,16 @@ resource "aws_route_table_association" "main" {
 
 resource "aws_security_group" "main" {
   name        = local.resource_name
-  description = "Custom Security Group with specific ports"
+  description = "CAST AI security group for edge location ${local.resource_name}"
   vpc_id      = local.vpc_id
 
-  # TCP ports: 6443
+  # Allow all traffic within the security group
   ingress {
-    description = "Kubernetes API"
-    from_port   = 6443
-    to_port     = 6443
-    protocol    = "tcp"
-    cidr_blocks = [var.security_group_source_cidr]
-  }
-
-  # UDP port: 51840
-  ingress {
-    description = "WireGuard"
-    from_port   = 51840
-    to_port     = 51840
-    protocol    = "udp"
-    cidr_blocks = [var.security_group_source_cidr]
+    description = "Allow all traffic within security group"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    self        = true
   }
 
   # Allow all outbound traffic
@@ -305,11 +326,13 @@ resource "aws_security_group" "main" {
 # =============================================================================
 
 resource "castai_edge_location" "this" {
-  name            = local.generated_name
-  region          = var.region
-  cluster_id      = var.cluster_id
-  organization_id = var.organization_id
-  description     = var.description != null ? var.description : local.default_description
+  name               = local.generated_name
+  region             = var.region
+  cluster_id         = var.cluster_id
+  organization_id    = var.organization_id
+  control_plane_mode = "SHARED"
+  control_plane      = var.control_plane
+  description        = var.description != null ? var.description : local.default_description
   zones = [
     for zone in var.zones : {
       id   = data.aws_availability_zone.zones[zone].zone_id
@@ -319,14 +342,20 @@ resource "castai_edge_location" "this" {
 
   # AWS cloud provider configuration
   aws = {
-    account_id           = data.aws_caller_identity.current.account_id
-    instance_profile     = var.instance_profile
-    access_key_id_wo     = aws_iam_access_key.castai.id
-    secret_access_key_wo = aws_iam_access_key.castai.secret
-    vpc_id               = local.vpc_id
-    vpc_peered           = var.vpc_peered
-    security_group_id    = local.security_group_id
-    subnet_ids           = local.subnet_ids_map
-    name_tag             = local.resource_name
+    account_id        = data.aws_caller_identity.current.account_id
+    role_arn          = aws_iam_role.castai.arn
+    instance_profile  = var.instance_profile
+    vpc_id            = local.vpc_id
+    vpc_cidr          = var.vpc_cidr
+    vpc_peered        = var.vpc_peered
+    security_group_id = local.security_group_id
+    subnet_ids        = local.subnet_ids_map
   }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.castai,
+    aws_nat_gateway.main,
+    aws_route.nat,
+    aws_route_table_association.main,
+  ]
 }

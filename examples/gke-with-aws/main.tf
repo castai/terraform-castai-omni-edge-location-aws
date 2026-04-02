@@ -73,6 +73,7 @@ module "castai_aws_edge_location" {
 # =============================================================================
 # Edge location with existing vpc
 # =============================================================================
+# Note: castai_aws_edge_location module expects that existing vpc has egress traffic setup.
 
 module "vpc" {
   source = "terraform-aws-modules/vpc/aws"
@@ -80,8 +81,12 @@ module "vpc" {
   name = "existing-vpc"
   cidr = "10.0.0.0/16"
 
-  azs            = ["eu-central-1a", "eu-central-1b"]
-  public_subnets = ["10.0.0.0/24", "10.0.1.0/24"]
+  azs             = ["eu-central-1a", "eu-central-1b"]
+  private_subnets = ["10.0.0.0/24", "10.0.1.0/24"]
+  public_subnets  = ["10.0.100.0/24", "10.0.101.0/24"]
+
+  enable_nat_gateway = true
+  single_nat_gateway = true
 }
 
 module "castai_aws_edge_location_existing_vpc" {
@@ -92,11 +97,11 @@ module "castai_aws_edge_location_existing_vpc" {
 
   region     = data.aws_region.current.region
   vpc_id     = module.vpc.vpc_id
-  subnet_ids = module.vpc.public_subnets
+  subnet_ids = module.vpc.private_subnets
   zones      = module.vpc.azs
 
   tags = {
     ManagedBy = "terraform"
   }
-  depends_on = [module.castai-gke-cluster]
+  depends_on = [module.castai-gke-cluster, module.vpc]
 }

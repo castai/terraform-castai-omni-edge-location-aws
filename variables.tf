@@ -36,12 +36,6 @@ variable "zones" {
   type        = list(string)
 }
 
-variable "security_group_source_cidr" {
-  description = "Source CIDR for security group ingress rules"
-  type        = string
-  default     = "0.0.0.0/0"
-}
-
 variable "vpc_id" {
   description = "ID of existing VPC to use. If not provided, a new VPC will be created."
   type        = string
@@ -70,4 +64,15 @@ variable "tags" {
   description = "Tags to apply to AWS resources"
   type        = map(string)
   default     = {}
+}
+
+variable "control_plane" {
+  description = <<-EOT
+    Edge location control plane configuration.
+    - ha (bool): enable high availability mode for the Edge location control plane (default: true)
+  EOT
+  type = object({
+    ha = optional(bool, true)
+  })
+  default = {}
 }
