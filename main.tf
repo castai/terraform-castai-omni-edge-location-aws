@@ -332,6 +332,7 @@ resource "castai_edge_location" "this" {
   organization_id    = var.organization_id
   control_plane_mode = "SHARED"
   control_plane      = var.control_plane
+  networking         = var.networking
   description        = var.description != null ? var.description : local.default_description
   zones = [
     for zone in var.zones : {

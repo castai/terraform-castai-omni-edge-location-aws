@@ -76,3 +76,14 @@ variable "control_plane" {
   })
   default = {}
 }
+
+variable "networking" {
+  description = <<-EOT
+    Edge cluster networking configuration.
+    - tunneled_cidrs (list(string)): list of destination CIDR blocks whose traffic should be routed through the main cluster instead of directly from the edge cluster.
+  EOT
+  type = object({
+    tunneled_cidrs = optional(list(string))
+  })
+  default = null
+}
