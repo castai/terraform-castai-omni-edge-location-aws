@@ -126,12 +126,6 @@ variable "edge_configurations" {
   default = {}
 }
 
-variable "default_edge_configuration" {
-  type        = string
-  description = "ID of the default edge configuration"
-  default     = ""
-}
-
 variable "default_edge_configuration_name" {
   type        = string
   description = "Name of the default edge configuration"
