@@ -389,11 +389,3 @@ resource "castai_edge_configuration_default" "this" {
   edge_location_id = castai_edge_location.this.id
   configuration_id = castai_edge_configuration.this[var.default_edge_configuration_name].id
 }
-
-# A default edge configuration is created by the backend as a part of edge location creation
-data "castai_edge_configuration" "this" {
-  organization_id  = var.organization_id
-  cluster_id       = var.cluster_id
-  edge_location_id = castai_edge_location.this.id
-  name             = "default"
-}
