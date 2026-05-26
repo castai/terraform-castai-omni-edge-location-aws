@@ -22,3 +22,15 @@ output "aws_resources" {
     subnet_ids        = local.subnet_ids_map
   }
 }
+
+output "edge_configuration_ids" {
+  description = "Map of edge configuration IDs by name"
+  value = {
+    for k, v in castai_edge_configuration.this : v.name => v.id
+  }
+}
+
+output "edge_configurations" {
+  description = "Created edge configurations"
+  value       = castai_edge_configuration.this
+}

@@ -39,6 +39,8 @@ locals {
   default_description = var.subnet_ids != null ? (
     "AWS edge location onboarded by Terraform using existing VPC ${var.vpc_id}"
   ) : "AWS edge location onboarded by Terraform"
+
+  default_config_id = var.default_edge_configuration_name != "" ? castai_edge_configuration.this[var.default_edge_configuration_name].id : var.default_edge_configuration
 }
 
 # Generate random suffix for edge location name
@@ -359,4 +361,41 @@ resource "castai_edge_location" "this" {
     aws_route.nat,
     aws_route_table_association.main,
   ]
+}
+
+# =============================================================================
+# CAST AI Edge Configuration (AWS)
+# =============================================================================
+
+resource "castai_edge_configuration" "this" {
+  for_each = { for k, v in var.edge_configurations : k => v }
+
+  organization_id  = var.organization_id
+  cluster_id       = var.cluster_id
+  edge_location_id = castai_edge_location.this.id
+  name             = try(each.value.name, each.key)
+  user_data_base64 = try(each.value.user_data_base64, null)
+
+  aws = {
+    image_id           = try(each.value.image_id, null)
+    boot_disk_size_gib = try(each.value.boot_disk_size_gib, null)
+    tags               = try(each.value.tags, {})
+  }
+}
+
+resource "castai_edge_configuration_default" "this" {
+  count = var.default_edge_configuration_name != "" || var.default_edge_configuration != "" ? 1 : 0
+
+  organization_id  = var.organization_id
+  cluster_id       = var.cluster_id
+  edge_location_id = castai_edge_location.this.id
+  configuration_id = local.default_config_id
+}
+
+# A default edge configuration is created by the backend as a part of edge location creation
+data "castai_edge_configuration" "this" {
+  organization_id  = var.organization_id
+  cluster_id       = var.cluster_id
+  edge_location_id = castai_edge_location.this.id
+  name             = "default"
 }
