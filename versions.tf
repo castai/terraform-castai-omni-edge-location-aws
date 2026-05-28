@@ -4,7 +4,7 @@ terraform {
   required_providers {
     castai = {
       source  = "castai/castai"
-      version = ">= 8.34.0"
+      version = ">= 8.34.0, < 8.38.0"
     }
     aws = {
       source  = "hashicorp/aws"
