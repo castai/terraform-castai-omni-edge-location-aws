@@ -71,7 +71,7 @@ module "castai_aws_edge_location" {
 |------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.0 |
 | <a name="requirement_aws"></a> [aws](#requirement\_aws) | >= 4.0 |
-| <a name="requirement_castai"></a> [castai](#requirement\_castai) | >= 8.34.0 |
+| <a name="requirement_castai"></a> [castai](#requirement\_castai) | >= 8.34.0, < 8.38.0 |
 | <a name="requirement_null"></a> [null](#requirement\_null) | >= 3.0 |
 | <a name="requirement_random"></a> [random](#requirement\_random) | >= 3.0 |
 
