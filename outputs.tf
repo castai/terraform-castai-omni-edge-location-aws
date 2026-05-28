@@ -24,13 +24,8 @@ output "aws_resources" {
 }
 
 output "edge_configuration_ids" {
-  description = "Map of edge configuration IDs by name"
+  description = "Map of edge configuration IDs by configuration key"
   value = {
-    for k, v in castai_edge_configuration.this : v.name => v.id
+    for k, v in castai_edge_configuration.this : k => v.id
   }
-}
-
-output "edge_configurations" {
-  description = "Created edge configurations"
-  value       = castai_edge_configuration.this
 }

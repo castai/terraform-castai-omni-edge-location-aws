@@ -119,5 +119,20 @@ module "castai_aws_edge_location_existing_vpc" {
   tags = {
     ManagedBy = "terraform"
   }
+
+  default_edge_configuration_name = "gpu"
+
+  # Example edge configurations
+  edge_configurations = {
+    gpu = {
+      name = "gpu"
+      image_id           = "ami-0gpu1234567890"  # GPU-enabled AMI
+      boot_disk_size_gib = 200
+      tags = {
+        Workload = "gpu"
+      }
+    }
+  }
+
   depends_on = [module.castai-gke-cluster, module.vpc]
 }

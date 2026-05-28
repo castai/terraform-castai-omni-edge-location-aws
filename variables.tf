@@ -98,6 +98,7 @@ variable "edge_configurations" {
     - boot_disk_size_gib (number, optional): Boot disk size in GiB.
     - user_data_base64 (string, optional): Base64 encoded user data to run on the edge as part of bootstrap. The payload must start with either `#cloud-config` (cloud-init YAML) or `#!` (shell script with a shebang).
     - tags (map(string), optional): Tags to apply to edge instances created with this configuration.
+    - cri
 
     Example:
     edge_configurations = {
@@ -121,6 +122,7 @@ variable "edge_configurations" {
     image_id           = optional(string)
     boot_disk_size_gib = optional(number)
     user_data_base64   = optional(string)
+    cri                = optional(map(string), {})
     tags               = optional(map(string), {})
   }))
   default = {}
