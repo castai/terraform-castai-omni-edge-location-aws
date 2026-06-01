@@ -360,3 +360,41 @@ resource "castai_edge_location" "this" {
     aws_route_table_association.main,
   ]
 }
+
+# =============================================================================
+# CAST AI Edge Configuration (AWS)
+# =============================================================================
+
+resource "castai_edge_configuration" "this" {
+  for_each = { for k, v in var.edge_configurations : k => v }
+
+  organization_id  = var.organization_id
+  cluster_id       = var.cluster_id
+  edge_location_id = castai_edge_location.this.id
+  name             = try(each.value.name, each.key)
+  user_data_base64 = try(each.value.user_data_base64, null)
+  cri              = try(each.value.cri, null)
+
+  aws = {
+    image_id           = try(each.value.image_id, null)
+    boot_disk_size_gib = try(each.value.boot_disk_size_gib, null)
+    tags               = try(each.value.tags, {})
+  }
+}
+
+resource "castai_edge_configuration_default" "this" {
+  count = var.default_edge_configuration_name != "" ? 1 : 0
+
+  organization_id  = var.organization_id
+  cluster_id       = var.cluster_id
+  edge_location_id = castai_edge_location.this.id
+  configuration_id = castai_edge_configuration.this[var.default_edge_configuration_name].id
+
+  lifecycle {
+    precondition {
+      condition     = var.default_edge_configuration_name == "" || can(castai_edge_configuration.this[var.default_edge_configuration_name])
+      error_message = "The specified default_edge_configuration_name '${var.default_edge_configuration_name}' does not match any key in var.edge_configurations."
+    }
+  }
+}
+

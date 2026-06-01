@@ -87,3 +87,49 @@ variable "networking" {
   })
   default = null
 }
+
+variable "edge_configurations" {
+  description = <<-EOT
+    Map of AWS edge configurations to create for this edge location.
+
+    Each configuration supports the following attributes:
+    - name (string, optional): Name of the edge configuration. Defaults to the map key.
+    - image_id (string, optional): AMI ID or name filter for edge instances (e.g., "ami-0abcdef1234567890" or "al2023-ami-ecs-hvm-*").
+    - boot_disk_size_gib (number, optional): Boot disk size in GiB.
+    - user_data_base64 (string, optional): Base64 encoded user data to run on the edge as part of bootstrap. The payload must start with either `#cloud-config` (cloud-init YAML) or `#!` (shell script with a shebang).
+    - tags (map(string), optional): Tags to apply to edge instances created with this configuration.
+    - cri
+
+    Example:
+    edge_configurations = {
+      "default" = {
+        image_id = "ami-0abcdef1234567890"
+        tags = {
+          Environment = "production"
+        }
+      }
+      "gpu" = {
+        image_id           = "ami-0gpu1234567890"
+        boot_disk_size_gib = 200
+        tags = {
+          Workload = "gpu"
+        }
+      }
+    }
+  EOT
+  type = map(object({
+    name               = optional(string)
+    image_id           = optional(string)
+    boot_disk_size_gib = optional(number)
+    user_data_base64   = optional(string)
+    cri                = optional(map(string), {})
+    tags               = optional(map(string), {})
+  }))
+  default = {}
+}
+
+variable "default_edge_configuration_name" {
+  type        = string
+  description = "Name of the default edge configuration"
+  default     = ""
+}
