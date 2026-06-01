@@ -366,14 +366,14 @@ resource "castai_edge_location" "this" {
 # =============================================================================
 
 resource "castai_edge_configuration" "this" {
-  for_each = { for k, v in var.edge_configurations : k => v }
+  for_each = var.edge_configurations
 
   organization_id  = var.organization_id
   cluster_id       = var.cluster_id
   edge_location_id = castai_edge_location.this.id
-  name             = try(each.value.name, each.key)
+  name             = each.value.name
   user_data_base64 = try(each.value.user_data_base64, null)
-  cri              = try(each.value.cri, null)
+  cri              = try(each.value.cri, {})
 
   aws = {
     image_id           = try(each.value.image_id, null)
