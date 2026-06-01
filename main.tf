@@ -397,3 +397,4 @@ resource "castai_edge_configuration_default" "this" {
     }
   }
 }
+
