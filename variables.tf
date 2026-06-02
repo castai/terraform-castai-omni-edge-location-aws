@@ -132,4 +132,9 @@ variable "default_edge_configuration_name" {
   type        = string
   description = "Name of the default edge configuration"
   default     = ""
+
+  validation {
+    condition     = var.default_edge_configuration_name == "" || can(var.edge_configurations[var.default_edge_configuration_name])
+    error_message = "The specified default_edge_configuration_name does not match any key in var.edge_configurations."
+  }
 }
