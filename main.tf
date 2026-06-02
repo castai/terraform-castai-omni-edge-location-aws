@@ -366,14 +366,14 @@ resource "castai_edge_location" "this" {
 # =============================================================================
 
 resource "castai_edge_configuration" "this" {
-  for_each = { for k, v in var.edge_configurations : k => v }
+  for_each = var.edge_configurations
 
   organization_id  = var.organization_id
   cluster_id       = var.cluster_id
   edge_location_id = castai_edge_location.this.id
-  name             = try(each.value.name, each.key)
-  user_data_base64 = try(each.value.user_data_base64, null)
-  cri              = try(each.value.cri, null)
+  name             = each.value.name
+  user_data_base64 = each.value.user_data_base64
+  cri              = each.value.cri
 
   aws = {
     image_id           = try(each.value.image_id, null)
@@ -389,12 +389,5 @@ resource "castai_edge_configuration_default" "this" {
   cluster_id       = var.cluster_id
   edge_location_id = castai_edge_location.this.id
   configuration_id = castai_edge_configuration.this[var.default_edge_configuration_name].id
-
-  lifecycle {
-    precondition {
-      condition     = var.default_edge_configuration_name == "" || can(castai_edge_configuration.this[var.default_edge_configuration_name])
-      error_message = "The specified default_edge_configuration_name '${var.default_edge_configuration_name}' does not match any key in var.edge_configurations."
-    }
-  }
 }
 
