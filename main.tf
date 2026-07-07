@@ -334,6 +334,7 @@ resource "castai_edge_location" "this" {
   control_plane      = var.control_plane
   networking         = var.networking
   description        = var.description != null ? var.description : local.default_description
+  addons             = var.addons
   zones = [
     for zone in var.zones : {
       id   = data.aws_availability_zone.zones[zone].zone_id

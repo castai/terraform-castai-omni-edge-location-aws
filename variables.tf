@@ -128,6 +128,22 @@ variable "edge_configurations" {
   default = {}
 }
 
+variable "addons" {
+  description = <<-EOT
+    Optional addons to install on the edge cluster. Defaults to null (provider installs nvidia-gpu-operator by default).
+    Set to an empty list to install no addons.
+
+    Each addon supports:
+    - name (string, required): Addon identifier. One of: nvidia-gpu-operator, nvidia-dra, nvidia-network-operator, oci-csi.
+    - values (string, optional): Helm values for the addon, encoded as a JSON object.
+  EOT
+  type = list(object({
+    name   = string
+    values = optional(string)
+  }))
+  default = null
+}
+
 variable "default_edge_configuration_name" {
   type        = string
   description = "Name of the default edge configuration"
