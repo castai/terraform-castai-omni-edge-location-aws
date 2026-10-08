@@ -333,6 +333,7 @@ resource "castai_edge_location" "this" {
   control_plane_mode = "SHARED"
   control_plane      = var.control_plane
   networking         = var.networking
+  liqo               = var.liqo
   description        = var.description != null ? var.description : local.default_description
   addons             = var.addons
   zones = [
