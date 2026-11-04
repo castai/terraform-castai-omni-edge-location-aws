@@ -1,0 +1,15 @@
+castai_api_token = "your-castai-api-token"
+castai_api_url   = "https://api.cast.ai"
+organization_id  = "your-castai-organization-id"
+cluster_id       = "your-castai-cluster-id"
+
+region = "your-aws-region"
+zones  = ["your-aws-az-a", "your-aws-az-b"]
+
+# name                = "my-edge-location"            # optional, auto-generated if omitted
+# description         = "My AWS edge location"        # optional
+# control_plane  = { ha = true }                      # optional, HA enabled by default
+# liqo = {                                            # optional
+#   gateway_replicas = 2
+#   gateway_server   = { external_address = "gw.edge.example.com" }
+# }
